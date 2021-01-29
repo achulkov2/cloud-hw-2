@@ -27,7 +27,7 @@ def query(s):
 def healthcheck():
     try:
         cn, cr = query("SELECT * FROM ServiceStatus WHERE status = 'AVAILABLE'")
-        return {"services": [{"ip": ip, "status": status} for ip, status in cr.fetchall()]}
+        return {"ip": LOCAL_HOSTNAME, "services": [{"ip": ip, "status": status} for ip, status in cr.fetchall()]}
     except:
         return {"error": "Database is unavailable"}
 
