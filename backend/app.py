@@ -4,29 +4,39 @@ from psycopg2 import connect
 
 app = Flask(__name__)
 
-LOCAL_HOSTNAME = os.environ['LOCAL_HOSTNAME']
+LOCAL_HOSTNAME = os.environ["LOCAL_HOSTNAME"]
+POSTGRES_HOST = os.environ["POSTGRES_HOST"]
+POSTGRES_PORT = 5432
+POSTGRES_DB = "postgres"
+POSTGRES_USER = "postgres"
+POSTGRES_PASSWORD = "myverysecretpassword"
 
-@app.route('/healthcheck', methods=['GET'])
+
+def query(s):
+    conn = connect(host=POSTGRES_HOST,
+                   port=POSTGRES_PORT,
+                   dbname=POSTGRES_DB,
+                   user=POSTGRES_USER,
+                   password=POSTGRES_PASSWORD)
+    cursor = conn.cursor()
+    cursor.execute(s)
+    return conn, cursor
+
+
+@app.route("/healthcheck", methods=["GET"])
 def healthcheck():
     try:
-        conn = connect(host='192.168.10.15', port=5432, dbname='postgres', user='postgres', password='myverysecretpassword')
-        cursor = conn.cursor()
-        cursor.execute('SELECT * FROM ServiceStatus')
-        res = cursor.fetchall()
-        response = {
-            'services': [{'ip': ip, 'status': status} for ip, status in res]
-        }
+        cn, cr = query("SELECT * FROM ServiceStatus WHERE status = 'AVAILABLE'")
+        return {"services": [{"ip": ip, "status": status} for ip, status in cr.fetchall()]}
     except:
-        response = {'error': 'Database is unavailable'}
-    return response
+        return {"error": "Database is unavailable"}
 
-if __name__ == '__main__':
-    conn = connect(host='192.168.10.15', port=5432, dbname='postgres', user='postgres', password='myverysecretpassword')
-    cursor = conn.cursor()
-    cursor.execute(f'SELECT * FROM ServiceStatus WHERE ip = "{LOCAL_HOSTNAME}"')
-    if cursor.fetchall():
-        cursor.execute(f'UPDATE ServiceStatus SET status="AVAILABLE" WHERE ip = "{LOCAL_HOSTNAME}"')
+
+if __name__ == "__main__":
+    cn, cr = query(f"SELECT * FROM ServiceStatus WHERE ip = '{LOCAL_HOSTNAME}'")
+    if cr.fetchall():
+        cr.execute(f"UPDATE ServiceStatus SET status='AVAILABLE' WHERE ip = '{LOCAL_HOSTNAME}'")
     else:
-        cursor.execute(f'INSERT INTO ServiceStatus VALUES ("{LOCAL_HOSTNAME}", "AVAILABLE")')
-    cursor.commit()
-    app.run(host='0.0.0.0', port=80)
+        cr.execute(f"INSERT INTO ServiceStatus VALUES ('{LOCAL_HOSTNAME}', 'AVAILABLE')")
+    cn.commit()
+    app.run(host="0.0.0.0", port=80)
